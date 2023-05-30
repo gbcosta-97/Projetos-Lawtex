@@ -1,0 +1,361 @@
+template[TEMP_Procuracao] { 
+    metainfo { 
+        language = "pt_BR"
+        name = "Procuração"
+        style = "STY_Padrão.lawsty"
+        declarations {
+            // CONSTANTES
+                -#bl# : String {value = "\b"},
+                -#dbl# : String {value = "\b\b"},
+                -#parag# : String {value = "\t"},
+            // LISTAS
+                +<tipoProcuracao> : List ("Ad judicia", "Ad judicia et extra") {
+                    name = "Tipo da procuração"
+                    request = "Informe o tipo da procuração"
+                    atomic = true
+                },
+            // TIPOS STRUCTS
+                struct [STR_Endereco] {
+                    name = "Endereço"
+                    id = "Rua " & [logradouro] & ", nº " & [numero] & printIf([complemento].isNotEmpty(), ", complemento " & [complemento], null) & ", bairro " & [bairro] & ", CEP " & [cep] & ", " & firstUpper([cidade]) & "/" & [estado].getByKey("Sigla")
+                    fields {
+                        -[state] : String,
+                        -[proxy_cep] : String,
+                        +[cep] : String where ("CEP"){
+                            name = "CEP"
+                        },
+                        -[cidade] : String {
+                            name = "Cidade"
+                        },
+                        -[estado] : List[*Uf] {
+                            name = "Estado"
+                            atomic = true
+                        },
+                        -[logradouro] : String { 
+                            name = "Logradouro"
+                        },
+                        +[numero] : String {
+                            name = "Número"
+                            help = "Se não houver, informe \"S/N\"."
+                        },
+                        &[complemento] : String {
+                            name = "Complemento"
+                        },
+                        -[bairro] : String {
+                            name = "Bairro"
+                        }
+                    }
+                    loaders {
+                        if ([cep].isNotEmpty() AND <this>.isChecked() == false) {
+                            // LÓGICA PARA LIMPAR AS INFORMAÇÕES EM CASO DE MUDANÇA DE CEP
+                                if ([cep].hasChanged()) {
+                                    [cidade].clear(),
+                                    [estado].clear(),
+                                    [logradouro].clear(),
+                                    [numero].clear(),
+                                    [complemento].clear(),
+                                    [bairro].clear()
+                                },
+                            //CHAMADA DE API PARA PEGARMOS AS INFORMAÇÕES NO SITE DOS CORREIOS1
+                                APIGet(<this>, null, "https://brasilapi.com.br/api/cep/v1/" & [cep], "street:logradouro, neighborhood:bairro, city:cidade, cep:proxy_cep"),
+                            //MUDANÇA DE MANDATORY PARA CHECARMOS AS INFORMAÇÕES
+                                [cidade].mandatory = "+",
+                                [estado].mandatory = "+",
+                                [logradouro].mandatory = "+",
+                                [numero].mandatory = "+",
+                                [complemento].mandatory = "&",
+                                [bairro].mandatory = "&",
+                            // LÓGICA DA LISTA
+                                if ([state] == "SP") {[estado].add("São Paulo")}
+                                elseif ([state] == "AC") {[estado].add("Acre")}
+                                elseif ([state] == "AL") {[estado].add("Alagoas")}
+                                elseif ([state] == "AP") {[estado].add("Amapá")}
+                                elseif ([state] == "AM") {[estado].add("Amazonas")}
+                                elseif ([state] == "BA") {[estado].add("Bahia")}
+                                elseif ([state] == "CE") {[estado].add("Ceará")}
+                                elseif ([state] == "DF") {[estado].add("Distrito Federal")}
+                                elseif ([state] == "ES") {[estado].add("Espírito Santo")}
+                                elseif ([state] == "GO") {[estado].add("Goiás")}
+                                elseif ([state] == "MA") {[estado].add("Maranhão")}
+                                elseif ([state] == "MT") {[estado].add("Mato Grosso")}
+                                elseif ([state] == "MS") {[estado].add("Mato Grosso do Sul")}
+                                elseif ([state] == "MG") {[estado].add("Minas Gerais")}
+                                elseif ([state] == "PR") {[estado].add("Paraná")}
+                                elseif ([state] == "PB") {[estado].add("Paraíba")}
+                                elseif ([state] == "PA") {[estado].add("Pará")}
+                                elseif ([state] == "PE") {[estado].add("Pernambuco")}
+                                elseif ([state] == "PI") {[estado].add("Piauí")}
+                                elseif ([state] == "RJ") {[estado].add("Rio de Janeiro")}
+                                elseif ([state] == "RN") {[estado].add("Rio Grande do Norte")}
+                                elseif ([state] == "RS") {[estado].add("Rio Grande do Sul")}
+                                elseif ([state] == "RO") {[estado].add("Rondônia")}
+                                elseif ([state] == "RR") {[estado].add("Roraima")}
+                                elseif ([state] == "SC") {[estado].add("Santa Catarina")}
+                                elseif ([state] == "SE") {[estado].add("Sergipe")}
+                                elseif ([state] == "TO") {[estado].add("Tocantins")},
+                            //SALVAMOS AS RESPOSTAS
+                                <this>.save()
+                        }
+                    }
+                },
+                +<strPoderesEspeciais> : Struct {
+                    name = "Poderes especiais"
+                    fields {
+                        +[poderes] : Boolean {
+                            name = "Poderes especiais"
+                            request = "Será conferido poderes especiais ao outorgado?"
+                        },
+                        if ([poderes] == true) {
+                            +[listaPoderes] : List ("elaborar ou responder notificações judiciais e extrajudiciais", "receber citação", "receber intimações", "nomear prepostos", "receber e dar quitação", "transigir", "fazer acordo", "firmar compromisso", "renunciar", "desistir", "reconhecer a procedência do pedido") {
+                                name = "Quais?"
+                                request = "Assinale os poderes especiais que serão outorgados:"
+                                atomic = false
+                            }
+                        }
+                    }   
+                },
+            // MATRIZES - VETORES DE ESTRUTURAS - VECTOR [STRUCT]
+                +|mtxOutorgantes| : Vector[Struct] {
+                    name = "Dados do Outorgante"
+                    id = printIf ([naturezaJuridica] == "Pessoa Física", [nome] & ", " & printIf([ehBrasileiro], "brasileiro", [nacionalidade]) & ", " & [estadoCivil] & ", inscrito no CPF sob nº: " & [cpf] & " e cedula de identidade RG nº: " & [rg] & ", residente e domiciliado na " & [strEndereco] & ", endereço eletrônico " & [email], [razaoSocial] & ", pessoa jurídica de direito privado, devidamente registrado sob o CNPJ nº " & [cnpj] & ", e com sede na " & [strEndereco] & ", neste ato representada por " & [strRepresentanteLegal]) & "."
+                    fields {
+                        +[naturezaJuridica] : List ("Pessoa Física", "Pessoa Jurídica") {
+                            name = "Natureza Jurídica"
+                            request = "Selecione a natureza jurídica do Outorgante"
+                            atomic = true
+                        },
+                        if ([naturezaJuridica] == "Pessoa Física") {
+                            +[nome] : String {
+                                name = "Nome"
+                            },
+                            +[ehBrasileiro] : Boolean {
+                                name = "Nacionalidade"
+                                request = "O outorgante é Brasileiro?"
+                                default = true
+                            },
+                            if ([ehBrasileiro] == false) {
+                                +[nacionalidade] : String {
+                                    name = "Nacionalidade"
+                                }
+                            },
+                            +[estadoCivil] : List ("solteiro", "casado", "união Estável", "separado", "divorciado", "viúvo") {
+                                name = "Estado Civil"
+                                atomic = true
+                            },
+                            +[cpf] : String where ("CPF") {
+                                name = "CPF"
+                            },
+                            +[rg] : String {
+                                name = "RG"
+                            },
+                            +[email] : String {
+                                name = "E-mail"
+                            }
+                        }
+                        else {
+                            +[razaoSocial] : String {
+                                name = "Informe a Razão Social"
+                            },
+                            +[cnpj] : String where ("CNPJ") {
+                                name = "CNPJ"
+                            },
+                            +[email] : String {
+                                name = "E-mail"
+                            },
+                            +[strRepresentanteLegal] : Struct {
+                                name = "Dados do Representante Legal"
+                                id = [nome] & ", " & printIf([ehBrasileiro], "brasileiro", [nacionalidade]) & ", " & [estadoCivil] & ", inscrito no CPF sob nº: " & [cpf] & " e cedula de identidade RG nº: " & [rg] & ", residente e domiciliado na " & [strEndereco] & ", endereço eletrônico " & [email]
+                                fields {
+                                    +[nome] : String {
+                                        name = "Nome"
+                                    },
+                                    +[ehBrasileiro] : Boolean {
+                                        name = "Nacionalidade"
+                                        request = "O outorgante é Brasileiro?"
+                                        default = true
+                                    },
+                                    if ([ehBrasileiro] == false) {
+                                        +[nacionalidade] : String {
+                                            name = "Nacionalidade"
+                                        }
+                                    },
+                                    +[estadoCivil] : List ("solteiro", "casado", "união estável", "separado", "divorciado", "viúvo") {
+                                        name = "Estado Civil"
+                                        atomic = true
+                                    },
+                                    +[cpf] : String where ("CPF") {
+                                        name = "CPF"
+                                    },
+                                    +[rg] : String {
+                                        name = "RG"
+                                    },
+                                    +[email] : String {
+                                        name = "E-mail"
+                                    },
+                                    +[strEndereco] : STR_Endereco                                   
+                                }
+                            }
+                        },
+                        +[strEndereco] : STR_Endereco                    
+                    }
+                },
+                +|mtxOutorgados| : Vector[Struct] {
+                    name = "Dados do Outorgado"
+                    id = printIf([temSociedade] == true, [nome] & ", " & printIf([ehBrasileiro], "brasileiro", [nacionalidade]) & ", " & [estadoCivil] & ", advogado inscrito na OAB/" & [uf] & " sob o nº: " & [oab] & ", portador do RG nº: " & [rg] & ", CPF: " & [cpf] & ", integrante da " & [sociedade] & ", pessoa jurídica de direito privado, devidamente inscrita no CNPJ: " & [cnpj] & ", registrada na OAB/" & [uf] & " sob o nº: " & [registroSociedade] & ", com sede na " & [strEnderecoSociedade] & ", endereço eletrônico " & [emailSociedade], [nome] & ", " & printIf([ehBrasileiro], "brasileiro", [nacionalidade]) & ", " & [estadoCivil] & ", advogado inscrito na OAB/" & [uf] & " sob o nº: " & [oab] & ", portador do RG nº: " & [rg] & ", CPF: " & [cpf] & ", residente e domiciliado em " & [strEndereco] & ", endereço eletrônico " & [email]) & "."
+                    fields {
+                        +[nome] : String {
+                            name = "Nome"
+                        },
+                        +[ehBrasileiro] : Boolean {
+                            name = "Brasileiro"
+                            request = "O outorgado é brasileiro?"
+                            default = true
+                        },
+                        if ([ehBrasileiro] == false) {
+                            +[nacionalidade] : String {
+                                name = "Nacionalidade"
+                            }
+                        },
+                        +[estadoCivil] : List ("solteiro", "casado", "união estável", "separado", "divorciado", "viúvo") {
+                            name = "Estado Civil"
+                            atomic = true
+                        },
+                        +[oab] : String {
+                            name = "nº OAB"
+                        },
+                        +[uf] : List ("AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PR", "PB", "PA", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SE", "SP", "TO") {
+                            name = "UF"
+                            request = "Selecione o UF de emissão da carteira"
+                            atomic = true
+                        },
+                        +[cpf] : String where ("CPF") {
+                            name = "CPF"
+                        },
+                        +[rg] : String {
+                            name = "RG"
+                        },
+                        +[email] : String {
+                            name = "E-mail"
+                        },
+                        +[strEndereco] : STR_Endereco,
+                        +[temSociedade] : Boolean {
+                            name = "Sociedade"
+                            request = "O outorgado faz parte de sociedade de advocacia?"
+                        },
+                        if ([temSociedade] == true) {
+                            +[sociedade] : String {
+                                name = "Informe o nome da Sociedade de Advogados"
+                            },
+                            +[registroSociedade] : String {
+                                name = "Informe o nº de registro da sociedade na OAB"
+                            },
+                            +[cnpj] : String where ("CNPJ") {
+                                name = "CNPJ"
+                            },
+                            +[emailSociedade] : String {
+                                name = "Informe o e-mail da Sociedade"
+                            },
+                            +[strEnderecoSociedade] : STR_Endereco
+                        }
+                    }
+                },
+            // ENCERRAMENTO
+                +<desejaEmail> : Boolean {
+                    name = "Deseja e-mail?"
+                    help = "Ao clicar em \"SIM\", encaminharemos a procuração para todos os outorgantes e outorgados"
+                }
+        } 
+    } 
+    head { 
+        title = "Procuração " & it("ad judicia") & printIf(<tipoProcuracao> == "Ad judicia et extra", " " & it("et extra"), null) 
+    } 
+    body {
+        declarations {
+            branch[BRC_Qualificacao] {
+                operations {
+                    print uppercase(|mtxOutorgantes|.grammar(bold("outorgante"))) & ": ",
+                    foreach(<outorgante> IN |mtxOutorgantes|) where (separator = "%f;\b\b%s; \b\b%p; e \b\b%l\b\b") {
+                        print <outorgante>
+                    },
+                    print uppercase(|mtxOutorgados|.grammar(bold("outorgado"))) & ": ",
+                    foreach(<outorgado> IN |mtxOutorgados|) where (separator = "%f;\b\b%s; \b\b%p; e \b\b%l\b\b") {
+                        print <outorgado>
+                    }
+                }
+            },
+            branch[BRC_Poderes] {
+                operations {
+                if (<strPoderesEspeciais.poderes> == true) {
+                    print uppercase(bold("poderes:")) & " amplos poderes da cláusula " & <tipoProcuracao> & ", para, em qualquer juízo, instância ou tribunal, perante os Poderes Judiciário, Executivo e Legislativo, nos órgãos públicos e particulares, propor as medidas necessárias e cabíveis em amparo aos interesses do(a)(s) outorgante(s), além dos poderes especiais: " & <strPoderesEspeciais.listaPoderes> & " que ficarão fazendo parte integrante desta para este fim, podendo substabelecer esta em outrem, com ou sem reservas de iguais poderes, promover a defesa nas ações contrárias, acompanhando o feito até final solução, agindo, independentemente da ordem de nomeação, e praticar todos os atos necessários a tal intento e decorrentes desta procuração."
+                }
+                else {
+                    print uppercase(bold("poderes:")) & " amplos poderes da cláusula " & <tipoProcuracao> & ", para, em qualquer juízo, instância ou tribunal, perante os Poderes Judiciário, Executivo e Legislativo, nos órgãos públicos e particulares, propor as medidas necessárias e cabíveis em amparo aos interesses do(a)(s) outorgante(s), podendo substabelecer esta em outrem, com ou sem reservas de iguais poderes, promover a defesa nas ações contrárias, acompanhando o feito até final solução, agindo, independentemente da ordem de nomeação, e praticar todos os atos necessários a tal intento e decorrentes desta procuração."
+                } 
+                }
+            },
+            branch[BRC_Assinatura] {
+                operations {
+                    foreach(<outorgante> IN |mtxOutorgantes|) where (separator = "%f\b\b%s\b\b%p\b\b%l\b\b") {
+                        print #dbl# & align("____________________________________________", "center") & align(printIf(<outorgante.naturezaJuridica> == "Pessoa Física", <outorgante.nome>, <outorgante.strRepresentanteLegal.nome>), "center")                
+                    }
+                }
+            }
+        }
+        operations {
+            use BRC_Qualificacao,
+            use BRC_Poderes,
+            use BRC_Assinatura
+        }
+    }
+    foot {
+        declarations {
+            branch[TOC_Outorgantes] {
+                name = "Outorgantes"
+                index = true
+                operations {
+                    |mtxOutorgantes|.ask()
+                } 
+            },
+            branch[TOC_Outorgados] {
+                name = "Outorgados"
+                index = true
+                operations {
+                    |mtxOutorgados|.ask()
+                }
+            },
+            branch[TOC_Procuracao] {
+                name = "Poderes"
+                index = true
+                operations {
+                    <tipoProcuracao>.ask(),
+                    <strPoderesEspeciais>.ask()
+                }
+            },
+            branch[TOC_Encerramento] {
+                name = "Encerramento"
+                index = true
+                operations {
+                    <desejaEmail>.ask()
+                }
+            }
+        }
+        operations {
+            use TOC_Outorgantes,
+            use TOC_Outorgados,
+            use TOC_Procuracao,
+            use TOC_Encerramento
+        }
+    }
+    extra {
+        operations {
+            if (<desejaEmail>) {
+                foreach(<outorgante> IN |mtxOutorgantes|) {
+                    sendMail(<outorgante.email>, "Procuração", "Olá! Este é um e-mail automático para envio do documento finalizado.", "pdf")
+                },
+                foreach(<outorgado> IN |mtxOutorgados|) {
+                    sendMail(<outorgado.email>, "Procuração", "Olá! Este é um e-mail automático para envio do documento finalizado.", "pdf")
+                }
+            }
+        }
+    }  
+}

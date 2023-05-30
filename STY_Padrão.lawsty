@@ -1,0 +1,70 @@
+page-size: A4 portrait;
+page-margin: 30mm 25mm 25mm 30mm;
+page-number: true;
+content-margin: 0mm 0mm 0mm 0mm;
+font-size: 12;
+font-family: Arial;
+font-color: #000;
+text-align: justify;
+line-height: 15;
+line-spacing: 0mm;
+
+title-uppercase: true;
+title-font-size: 12;
+title-mask: 1.A.A.A.A.;
+title-tab: false;
+title-spacing-top: 0mm;
+title-spacing-left: 0mm;
+title-spacing-bottom: 0mm;
+title-max-level: 3;
+title-line-height: 20;
+title-align: left;
+
+head-title-font-size: 0;
+footnote-line-height: 15;
+footnote-spacing: 10;
+footnote-align: left;
+footer-font-family: Arial;
+footer-font-size: 10;
+header-font-size: 10;
+numbering-page-mask: %c/%p;
+numbering-position: footer;
+numbering-align: center;
+
+citation-size: 40;
+citation-font-size: 11;
+citation-line-height: 15;
+
+parag-mask: a.1.1.1.1.;
+parag-size: 13;
+parag-recursive: true;
+parag-number-of-spaces: 0;
+parag-linespacing-rule: null;
+parag-linespacing: null;
+
+list-enum: true;
+list-mask: 1.i.a;
+list-font-size: 11;
+list-font-bold: false;
+list-recursive: false;
+list-spacing: 10;
+list-left-delimiter:(;
+list-right-delimiter:) ;
+
+table-field-color: #EFEFEF;
+table-null-values: false;
+table-first-row-color: #EFEFEF;
+table-group: off;
+table-nowrap: off;
+table-field-size: 8.5;
+table-font-size: 9;
+table-padding: 5;
+table-orientation: horizontal;
+table-caption: bottom;
+table-distribution: uniform;
+table-caption-align: center;
+table-cell-align: center;
+table-border-width: 1;
+table-border-color: #999;
+table-width: 100%;
+form-first-row-color: #FFFFFF;
