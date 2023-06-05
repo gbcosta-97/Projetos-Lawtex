@@ -1,0 +1,417 @@
+template[TEMP_TermoCessaoPI] { 
+    metainfo { 
+        language = "pt_BR"
+        name = "Termo de Cessão de Propriedade Intelectual"
+        style = "STY_Padrão.lawsty"
+        declarations {
+            // CONSTANTES
+            -#bl# : String {value = "\b"},
+            -#dbl# : String {value = "\b\b"},
+            -#parag# : String {value = "\t"},
+            // TIPOS STRUCTS
+                struct[STR_Endereco] {
+                    name = "Endereço"
+                    id = [logradouro] & ", nº " & [numero] & printIf([complemento].isNotEmpty(), ", complemento " & [complemento], null) & ", " & [bairro] & ", CEP " & [cep] & ", " & firstUpper([cidade]) & "/" & [estado].getByKey("Sigla")
+                    fields {
+                        -[state] : String,
+                        -[proxy_cep] : String,
+                        +[cep] : String where ("CEP"){
+                            name = "CEP"
+                        },
+                        -[cidade] : String {
+                            name = "Cidade"
+                        },
+                        -[estado] : List[*Uf] {
+                            name = "Estado"
+                            atomic = true
+                        },
+                        -[logradouro] : String { 
+                            name = "Logradouro"
+                        },
+                        +[numero] : String {
+                            name = "Número"
+                            help = "Se não houver, informe \"S/N\"."
+                        },
+                        &[complemento] : String {
+                            name = "Complemento"
+                        },
+                        -[bairro] : String {
+                            name = "Bairro"
+                        }
+                    }
+                    loaders {
+                        if ([cep].isNotEmpty() AND <this>.isChecked() == false) {
+                            // LÓGICA PARA LIMPAR AS INFORMAÇÕES EM CASO DE MUDANÇA DE CEP
+                                if ([cep].hasChanged()) {
+                                    [cidade].clear(),
+                                    [estado].clear(),
+                                    [logradouro].clear(),
+                                    [numero].clear(),
+                                    [complemento].clear(),
+                                    [bairro].clear()
+                                },
+                            //CHAMADA DE API PARA PEGARMOS AS INFORMAÇÕES NO SITE DOS CORREIOS1
+                                APIGet(<this>, null, "https://brasilapi.com.br/api/cep/v1/" & [cep], "street:logradouro, neighborhood:bairro, city:cidade, cep:proxy_cep"),
+                            //MUDANÇA DE MANDATORY PARA CHECARMOS AS INFORMAÇÕES
+                                [cidade].mandatory = "+",
+                                [estado].mandatory = "+",
+                                [logradouro].mandatory = "+",
+                                [numero].mandatory = "+",
+                                [complemento].mandatory = "&",
+                                [bairro].mandatory = "&",
+                            // LÓGICA DA LISTA
+                                if ([state] == "SP") {[estado].add("São Paulo")}
+                                elseif ([state] == "AC") {[estado].add("Acre")}
+                                elseif ([state] == "AL") {[estado].add("Alagoas")}
+                                elseif ([state] == "AP") {[estado].add("Amapá")}
+                                elseif ([state] == "AM") {[estado].add("Amazonas")}
+                                elseif ([state] == "BA") {[estado].add("Bahia")}
+                                elseif ([state] == "CE") {[estado].add("Ceará")}
+                                elseif ([state] == "DF") {[estado].add("Distrito Federal")}
+                                elseif ([state] == "ES") {[estado].add("Espírito Santo")}
+                                elseif ([state] == "GO") {[estado].add("Goiás")}
+                                elseif ([state] == "MA") {[estado].add("Maranhão")}
+                                elseif ([state] == "MT") {[estado].add("Mato Grosso")}
+                                elseif ([state] == "MS") {[estado].add("Mato Grosso do Sul")}
+                                elseif ([state] == "MG") {[estado].add("Minas Gerais")}
+                                elseif ([state] == "PR") {[estado].add("Paraná")}
+                                elseif ([state] == "PB") {[estado].add("Paraíba")}
+                                elseif ([state] == "PA") {[estado].add("Pará")}
+                                elseif ([state] == "PE") {[estado].add("Pernambuco")}
+                                elseif ([state] == "PI") {[estado].add("Piauí")}
+                                elseif ([state] == "RJ") {[estado].add("Rio de Janeiro")}
+                                elseif ([state] == "RN") {[estado].add("Rio Grande do Norte")}
+                                elseif ([state] == "RS") {[estado].add("Rio Grande do Sul")}
+                                elseif ([state] == "RO") {[estado].add("Rondônia")}
+                                elseif ([state] == "RR") {[estado].add("Roraima")}
+                                elseif ([state] == "SC") {[estado].add("Santa Catarina")}
+                                elseif ([state] == "SE") {[estado].add("Sergipe")}
+                                elseif ([state] == "TO") {[estado].add("Tocantins")},
+                            //SALVAMOS AS RESPOSTAS
+                                <this>.save()
+                        }
+                    }
+                },
+                +<strLocalData> : Struct {
+                    name = "Local e data de assinatura"
+                    id = [cidadeUf] & ", " & expandedDate([data])
+                    fields {
+                        +[cidadeUf] : String {
+                            name = "Local de assinatura"
+                            request = "Informe o local de assinatura como Cidade/UF"
+                        },
+                        +[data] : String where ("\d\d/\d\d/\d\d\d\d") {
+                            name = "Data"
+                            request = "Informe a data de assinatura do contrato"
+                        }
+                    }
+                },
+                +<strVinculo> : Struct {
+                    name = "Vínculo"
+                    fields {
+                        +[vinculo] : List ("sócio(a)", "empregado(a)", "estagiário(a)", "prestador(a) de serviços", "diretor(a)", "outro (especificar)" ) {
+                            name = "Vínculo"
+                            request = "A cedente é o que da empresa?"
+                            atomic = true
+                        },
+                        if ([vinculo] == "outro (especificar)") {
+                            +[vinculoOutro] : String {
+                                name = "Qual cargo?"
+                                request = "Especifique de forma sucinta o cargo da cedente"
+                            }
+                        }
+                    }
+                },
+            // MATRIZES - VETORES DE ESTRUTURAS - VECTOR [STRUCT]
+                +<strCessionaria> : Struct {
+                    name = "Qualificação da cessionária"
+                    id = printIf([naturezaJuridica] == "Pessoa Física", [nome] & ", " & printIf([ehBrasileiro], "brasileiro", [nacionalidade]) & ", " & [estadoCivil] & ", inscrito no CPF sob nº: " & [cpf] & " e cédula de identidade RG nº: " & [rg] & ", residente e domiciliado na " & [strEndereco] & ", endereço eletrônico " & mailto([email]), [razaoSocial] & ", pessoa jurídica de direito privado, devidamente registrado sob o CNPJ nº " & [cnpj] & ", e com sede na " & [strEndereco] & ", neste ato representada por " & [strRepresentanteLegal]) & "."
+                    fields {
+                        +[naturezaJuridica] : List ("Pessoa Física", "Pessoa Jurídica") {
+                            name = "Natureza Jurídica"
+                            request = "Selecione a natureza jurídica"
+                            atomic = true
+                        },
+                        if ([naturezaJuridica] == "Pessoa Física") {
+                            +[nome] : String {
+                                name = "Nome"
+                            },
+                            +[ehBrasileiro] : Boolean {
+                                name = "Brasileiro"
+                                request = "A parte é brasileira?"
+                                default = true
+                            },
+                            if ([ehBrasileiro] == false) {
+                                +[nacionalidade] : String {
+                                    name = "Nacionalidade"
+                                }
+                            },
+                            +[estadoCivil] : List ("solteiro", "casado", "separado", "divorciado", "viúvo") {
+                                name = "Estado Civil"
+                                atomic = true
+                            },
+                            +[cpf] : String where ("CPF"){
+                                name = "CPF"
+                            },
+                            +[rg] : String {
+                                name = "RG"
+                            },
+                            +[email] : String {
+                                name = "E-mail"
+                            }                            
+                        }
+                        else {
+                            +[razaoSocial] : String {
+                                name = "Informe a Razão Social"
+                            },
+                            +[cnpj] : String where ("CNPJ") {
+                                name = "CNPJ"
+                            },
+                            +[email] : String {
+                                name = "E-mail"
+                            },
+                            +[strRepresentanteLegal] : Struct {
+                                name = "Dados do representante legal"
+                                id =  [nome] & ", " & printIf([ehBrasileiro], "brasileiro", [nacionalidade]) & ", " & [estadoCivil] & ", inscrito no CPF sob nº: " & [cpf] & " e cédula de identidade RG nº: " & [rg] & ", residente e domiciliado na " & [strEndereco] & ", endereço eletrônico " & [email]
+                                fields {
+                                    +[nome] : String {
+                                        name = "Nome"
+                                    },
+                                    +[ehBrasileiro] : Boolean {
+                                        name = "Brasileiro"
+                                        request = "O representante é brasileiro?"
+                                        default = true
+                                    },
+                                    if ([ehBrasileiro] == false) {
+                                        +[nacionalidade] : String {
+                                            name = "Nacionalidade"
+                                        }
+                                    },
+                                    +[estadoCivil] : List ("solteiro", "casado", "separado", "divorciado", "viúvo") {
+                                        name = "Estado Civil"
+                                        atomic = true
+                                    },
+                                    +[cpf] : String where ("CPF"){
+                                        name = "CPF"
+                                    },
+                                    +[rg] : String {
+                                        name = "RG"
+                                    },
+                                    +[email] : String {
+                                        name = "E-mail"
+                                    },
+                                    +[strEndereco] : STR_Endereco
+                                }
+                            }
+                        },
+                        +[strEndereco] : STR_Endereco
+                    }
+                },
+                +<strCedente> : Struct {
+                    name = "Qualificação da cedente"
+                    id = printIf([naturezaJuridica] == "Pessoa Física", [nome] & ", " & printIf([ehBrasileiro], "brasileiro", [nacionalidade]) & ", " & [estadoCivil] & ", inscrito no CPF sob nº: " & [cpf] & " e cédula de identidade RG nº: " & [rg] & ", residente e domiciliado na " & [strEndereco] & ", endereço eletrônico " & mailto([email]), [razaoSocial] & ", pessoa jurídica de direito privado, devidamente registrado sob o CNPJ nº " & [cnpj] & ", e com sede na " & [strEndereco] & ", neste ato representada por " & [strRepresentanteLegal]) & "."
+                    fields {
+                        +[naturezaJuridica] : List ("Pessoa Física", "Pessoa Jurídica") {
+                            name = "Natureza Jurídica"
+                            request = "Selecione a natureza jurídica do Outorgante"
+                            atomic = true
+                        },
+                        if ([naturezaJuridica] == "Pessoa Física") {
+                            +[nome] : String {
+                                name = "Nome"
+                            },
+                            +[ehBrasileiro] : Boolean {
+                                name = "Nacionalidade"
+                                request = "O outorgante é Brasileiro?"
+                                default = true
+                            },
+                            if ([ehBrasileiro] == false) {
+                                +[nacionalidade] : String {
+                                    name = "Nacionalidade"
+                                }
+                            },
+                            +[estadoCivil] : List ("solteiro", "casado", "união Estável", "separado", "divorciado", "viúvo") {
+                                name = "Estado Civil"
+                                atomic = true
+                            },
+                            +[cpf] : String where ("CPF") {
+                                name = "CPF"
+                            },
+                            +[rg] : String {
+                                name = "RG"
+                            },
+                            +[email] : String {
+                                name = "E-mail"
+                            }
+                        }
+                        else {
+                            +[razaoSocial] : String {
+                                name = "Informe a Razão Social"
+                            },
+                            +[cnpj] : String where ("CNPJ") {
+                                name = "CNPJ"
+                            },
+                            +[email] : String {
+                                name = "E-mail"
+                            },
+                            +[strRepresentanteLegal] : Struct {
+                                name = "Dados do representante legal"
+                                id = [nome] & ", " & printIf([ehBrasileiro], "brasileiro", [nacionalidade]) & ", " & [estadoCivil] & ", inscrito no CPF sob nº: " & [cpf] & " e cedula de identidade RG nº: " & [rg] & ", residente e domiciliado na " & [strEndereco] & ", endereço eletrônico " & [email]
+                                fields {
+                                    +[nome] : String {
+                                        name = "Nome"
+                                    },
+                                    +[ehBrasileiro] : Boolean {
+                                        name = "Nacionalidade"
+                                        request = "O outorgante é Brasileiro?"
+                                        default = true
+                                    },
+                                    if ([ehBrasileiro] == false) {
+                                        +[nacionalidade] : String {
+                                            name = "Nacionalidade"
+                                        }
+                                    },
+                                    +[estadoCivil] : List ("solteiro", "casado", "união estável", "separado", "divorciado", "viúvo") {
+                                        name = "Estado Civil"
+                                        atomic = true
+                                    },
+                                    +[cpf] : String where ("CPF") {
+                                        name = "CPF"
+                                    },
+                                    +[rg] : String {
+                                        name = "RG"
+                                    },
+                                    +[email] : String {
+                                        name = "E-mail"
+                                    },
+                                    +[strEndereco] : STR_Endereco                                   
+                                }
+                            }
+                        },
+                        +[strEndereco] : STR_Endereco
+                    }
+                },
+            // Informações do Termo
+                +<cessaoFutura> : Boolean {
+                    name = "Cessão Futura"
+                    request = "Haverá cessão dos direitos do autor sobre obras futuras desenvolvidas durante a relação entre as partes?"
+                    help = "Obras futuras referem-se a criações que ainda não existem, apenas têm a expectativa de serem produzidas. Se não houver cessão de obras futuras, tudo o que o cedente criar após a assinatura deste contrato, enquanto ainda estiver na empresa, pode não estar protegido. É recomendável marcar a opção \"Sim\" para cessão futura."
+                },
+                +<qualContrato> : String {
+                    name = "Remuneração do cedente"
+                    request = "A cedente será remunerada com base em qual contrato? Escreva como se estivesse preenchendo o pontilhado: \"Contrato de ....\""
+                    help = "Ex: \"consultoria\", \"assessoria\", \"desenvolvimento de software\""
+                },
+                +<assinaturaDigital> : Boolean { 
+                    name = "Assinatura digital"
+                    request = "A assinatura será feita digitalmente?"
+                },
+                //ENCERRAMENTO
+                +<desejaEmail> : Boolean {
+                    name = "Deseja e-mail"
+                    help = "Ao clicar em \"SIM\", encaminharemos o documento por e-mail para as partes"
+                }
+        } 
+    } 
+    head { 
+        title = "Termo de Cessão de Direitos" 
+    } 
+    body {
+        declarations {
+            branch[BRC_Qualificacao] {
+                operations {
+                    print "Pelo presente instrumento particular e na melhor forma de direito, as seguintes partes estabelecem um compromisso de cessão de direitos:" & #dbl#,
+                    print bold("(A) ") & <strCessionaria> & " (\"Cessionária\"); e" & #dbl#,
+                    print bold("(B) ") & <strCedente> & " (\"Cedente\")." & #dbl#
+                }
+            },
+            branch[BRC_Informacoes] {
+                operations {
+                    print "A Cedente, na condição de " & printIf(<strVinculo.vinculo> == "outro (especificar)", <strVinculo.vinculoOutro>, <strVinculo.vinculo>) & " da Cessionária, assume frente a esta e quaisquer terceiros o seguinte compromisso (\"Compromisso\"):" & #dbl#,
+                    print bold("1. ") & underline("Cessão dos Direitos de Propriedade Intelectual. ") & "Conforme estabelecem o parágrafo único do artigo 11 e artigo 49 e seguintes da Lei 9.610/98, e artigo 4º da Lei 9.609/98, a Cedente cede, desde já, à Cessionária, em caráter permanente, irrevogável, irretratável e universal, de forma total e definitiva, todos e quaisquer direitos autorais patrimoniais decorrentes de obras, software, projetos, planos, metodologias, conceitos de produtos, técnicas, metodologias, sinais distintivos de marcas, invenções, melhorias, modelos de utilidade, desenhos industriais e demais criações intelectuais relacionadas às atividades da sociedade, assim como criações passíveis de proteção por patente, marcas e direito de imagem (os \"Direitos de Propriedade Intelectual\") desenvolvidos em razão do vínculo da Cedente com a Cessionária. A cessão total engloba tudo que já está feito no presente e o que virá a ser feito durante o relacionamento entre as Partes. Tal cessão persiste mesmo ao fim dessa relação, quanto aos Direitos de Propriedade Intelectual desenvolvidos durante sua vigência, reconhecendo a Cessionária como única, legítima e exclusiva titular dos Direitos de Propriedade Intelectual, podendo esta fazer qualquer uso deles, inclusive, mas não se limitnado a, reproduzir, adaptar, editar, traduzir, distribuir, ceder, em qualquer meio ou suporte, a qualquer título oneroso ou gratuito." & #dbl#,
+                    if (<cessaoFutura> == true) {
+                    print bold("2. ") & underline("Cessão das Obras Futuras.") & " Conforme estabelece o artigo 51 da Lei 9.610/98, a cessão de obras futuras (aquelas que ainda não existem, só sujeitas à expectativa de materialização posterior) abrangerá no máximo o período de cinco anos. As partes concordam com a cessão integral das obras futuras por esse período e comprometem-se a renovar essa cessão específica à medida que esse prazo termine." & #dbl#,
+                    print bold("3. ") & underline("Remuneração.") & " A Cedente reconhece, para tanto, que está sendo devidamente remunerada pela Cessionária com base no Contrato de " & <qualContrato> & " celebrado com a Cessionária, remuneração esta que é reconhecida pela Cedente como justa e suficiente para abranger a presente cessão e todos os direitos dela decorrentes em caráter irrevogável e irretratável." & #dbl#,
+                    print bold("4. ") & underline("Autoria e Originalidade.") & " A Cedente responsabiliza-se desde já, perante a Cessionária e quaisquer terceiros, pela autoria e originalidade de qualquer material ou conteúdo aplicado no desenvolvimento de seus trabalhos para a Cessionária, garantindo a não violação de quaisquer direitos de propriedade intelectual de terceiros, incluindo, mas não se limitando a direitos autorais, marcas, patentes, segredos de indústria e comércio e direitos de imagem. Dessa forma, a Cedente responsabiliza-se a indenizar a Cessionária caso este sofra eventuais perdas e danos decorrentes do uso indevido de propriedade intelectual alheia que julgara ser da Cedente." & #dbl#,
+                    print bold("5. ") & underline("Comunicação das Descobertas.") & " A Cedente reconhece que todas as invenções e melhorias, patenteáveis ou não, descobertas ou projetadas, ainda que em conjunto com outras pessoas, decorrentes do seu vínculo com a Cessionária, deverão ser prontamente comunicadas por escrito à Cessionária, sendo a propriedade de tais invenções e melhorias de benefício exclusivo da Cessionária." & #dbl#,
+                    print bold("6. ") & underline("Justa Causa.") & " A Cedente reconhece que qualquer violação deste Compromisso, bem como a mera tentativa de violação, poderá ensejar o encerramento de sua relação com a Cessionária por justa causa, sem prejuízo de composição de perdas e danos decorrentes da respectiva infração e de eventual multa estabelecida em outro contrato entre as partes." & #dbl#,
+                    print bold("7. ") & underline("Licença Subsidiária.") & " Caso a cessão Direitos de Propriedade Intelectual não seja integral ou parcialmente possível, legalmente ou por qualquer outro motivo, a Cedente concorda em outorgar à Cessionária uma licença mundial, livre de royalties, irrevogável, irretratável, perpétua, exclusiva e passível de sublicenciamento a critério exclusivo da Cessionária, sobre todos os Direitos de Propriedade Intelectual, sejam presentes ou futuros, que não possam ser cedidos, incluindo todos e quaisquer direitos autorais patrimoniais, abrangendo obras futuras, de usar, fruir e dispor,  bem como de criar obras derivadas e explorá-las economicamente, para todos os usos e mídias, presentes ou futuras, mencionados no presente Compromisso." & #dbl#,
+                    printIf(<assinaturaDigital> == true, bold("8. ") & underline("Certificação Digital de Assinaturas e de Vias deste Acordo.") & " As Partes neste ato declaram que (i) é admitida como válida e verdadeira a assinatura deste Acordo por meio de certificado digital emitido por entidades credenciadas para tanto pela Infraestrutura de Chaves Públicas Brasileira - ICP-Brasil; e (ii) são admitidas como válidas e originais as vias deste Acordo emitidas por meios de comprovação da autoria e integridade de documentos em forma eletrônica, inclusive os que utilizem certificados não emitidos pela ICP-Brasil." & #dbl#, null),
+                    print "Dando por justo e certo este Compromisso em todos os seus termos e condições, a Cedente o subscreve para fins e efeitos de direito." & #dbl#,
+                    print  align(<strLocalData>, "center")
+                    }
+                    else {
+                    print bold("2. ") & underline("Remuneração.") & " A Cedente reconhece, para tanto, que está sendo devidamente remunerada pela Cessionária com base no Contrato de " & <qualContrato> & " celebrado com a Cessionária, remuneração esta que é reconhecida pela Cedente como justa e suficiente para abranger a presente cessão e todos os direitos dela decorrentes em caráter irrevogável e irretratável." & #dbl#,
+                    print bold("3. ") & underline("Autoria e Originalidade.") & " A Cedente responsabiliza-se desde já, perante a Cessionária e quaisquer terceiros, pela autoria e originalidade de qualquer material ou conteúdo aplicado no desenvolvimento de seus trabalhos para a Cessionária, garantindo a não violação de quaisquer direitos de propriedade intelectual de terceiros, incluindo, mas não se limitando a direitos autorais, marcas, patentes, segredos de indústria e comércio e direitos de imagem. Dessa forma, a Cedente responsabiliza-se a indenizar a Cessionária caso este sofra eventuais perdas e danos decorrentes do uso indevido de propriedade intelectual alheia que julgara ser da Cedente." & #dbl#,
+                    print bold("4. ") & underline("Comunicação das Descobertas.") & " A Cedente reconhece que todas as invenções e melhorias, patenteáveis ou não, descobertas ou projetadas, ainda que em conjunto com outras pessoas, decorrentes do seu vínculo com a Cessionária, deverão ser prontamente comunicadas por escrito à Cessionária, sendo a propriedade de tais invenções e melhorias de benefício exclusivo da Cessionária." & #dbl#,
+                    print bold("5. ") & underline("Justa Causa.") & " A Cedente reconhece que qualquer violação deste Compromisso, bem como a mera tentativa de violação, poderá ensejar o encerramento de sua relação com a Cessionária por justa causa, sem prejuízo de composição de perdas e danos decorrentes da respectiva infração e de eventual multa estabelecida em outro contrato entre as partes." & #dbl#,
+                    print bold("6. ") & underline("Licença Subsidiária.") & " Caso a cessão Direitos de Propriedade Intelectual não seja integral ou parcialmente possível, legalmente ou por qualquer outro motivo, a Cedente concorda em outorgar à Cessionária uma licença mundial, livre de royalties, irrevogável, irretratável, perpétua, exclusiva e passível de sublicenciamento a critério exclusivo da Cessionária, sobre todos os Direitos de Propriedade Intelectual, sejam presentes ou futuros, que não possam ser cedidos, incluindo todos e quaisquer direitos autorais patrimoniais, abrangendo obras futuras, de usar, fruir e dispor,  bem como de criar obras derivadas e explorá-las economicamente, para todos os usos e mídias, presentes ou futuras, mencionados no presente Compromisso." & #dbl#,
+                    printIf(<assinaturaDigital> == true, bold("7. ") & underline("Certificação Digital de Assinaturas e de Vias deste Acordo.") & " As Partes neste ato declaram que (i) é admitida como válida e verdadeira a assinatura deste Acordo por meio de certificado digital emitido por entidades credenciadas para tanto pela Infraestrutura de Chaves Públicas Brasileira - ICP-Brasil; e (ii) são admitidas como válidas e originais as vias deste Acordo emitidas por meios de comprovação da autoria e integridade de documentos em forma eletrônica, inclusive os que utilizem certificados não emitidos pela ICP-Brasil." & #dbl#, null),
+                    print "Dando por justo e certo este Compromisso em todos os seus termos e condições, a Cedente o subscreve para fins e efeitos de direito." & #dbl#,
+                    print  align(<strLocalData>, "center")   
+                    } 
+                }
+            },
+            branch[BRC_Assinaturas] {
+                operations {
+                    print #dbl# & align("___________________________________", "center") & #bl# & align(printIf(<strCedente.naturezaJuridica> == "Pessoa Física", <strCedente.nome>, <strCedente.strRepresentanteLegal.nome>) , "center")
+                }
+            }
+        }
+        operations {
+            use BRC_Qualificacao,
+            use BRC_Informacoes,
+            use BRC_Assinaturas
+        }
+    }
+    foot {
+        declarations {
+            branch[TOC_Partes] {
+                name = "Dados das Partes"
+                index = true
+                operations {
+                    <strCessionaria>.ask(),
+                    <strCedente>.ask()
+                }
+            },
+            branch[TOC_Informacoes] {
+                name = "Informações do Termo"
+                index = true
+                operations {
+                    <strVinculo>.ask(),
+                    <qualContrato>.ask(),
+                    <cessaoFutura>.ask()
+                }
+            },
+            branch[TOC_ForoAssinatura] {
+                name = "Foro e Assinatura"
+                index = true
+                operations {
+                    <assinaturaDigital>.ask(),
+                    <strLocalData>.ask()
+                }
+            },
+            branch[TOC_Encerramento] {
+                name = "Encerramento"
+                index = true
+                operations {
+                    <desejaEmail>.ask()
+                }
+            }
+        }
+        operations {
+            use TOC_Partes,
+            use TOC_Informacoes,
+            use TOC_ForoAssinatura,
+            use TOC_Encerramento
+        }
+    }
+    extra {
+        operations {
+            if (<desejaEmail>) {
+                sendMail(<strCessionaria.email>,"Termo de Cessão","Olá! Este é um e-mail automático para envio do documento finalizado.","pdf"),
+                sendMail(<strCedente.email>,"Termo de Cessão","Olá! Este é um e-mail automático para envio do documento finalizado.","pdf")
+            }
+        }
+    }
+}
