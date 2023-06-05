@@ -17,7 +17,7 @@ template[TEMP_Procuracao] {
             // TIPOS STRUCTS
                 struct [STR_Endereco] {
                     name = "Endereço"
-                    id = "Rua " & [logradouro] & ", nº " & [numero] & printIf([complemento].isNotEmpty(), ", complemento " & [complemento], null) & ", bairro " & [bairro] & ", CEP " & [cep] & ", " & firstUpper([cidade]) & "/" & [estado].getByKey("Sigla")
+                    id = [logradouro] & ", nº " & [numero] & printIf([complemento].isNotEmpty(), ", complemento " & [complemento], null) & ", " & [bairro] & ", CEP " & [cep] & ", " & firstUpper([cidade]) & "/" & [estado].getByKey("Sigla")
                     fields {
                         -[state] : String,
                         -[proxy_cep] : String,
@@ -116,7 +116,7 @@ template[TEMP_Procuracao] {
                 },
             // MATRIZES - VETORES DE ESTRUTURAS - VECTOR [STRUCT]
                 +|mtxOutorgantes| : Vector[Struct] {
-                    name = "Dados do Outorgante"
+                    name = "Dados do outorgante"
                     id = printIf ([naturezaJuridica] == "Pessoa Física", [nome] & ", " & printIf([ehBrasileiro], "brasileiro", [nacionalidade]) & ", " & [estadoCivil] & ", inscrito no CPF sob nº: " & [cpf] & " e cedula de identidade RG nº: " & [rg] & ", residente e domiciliado na " & [strEndereco] & ", endereço eletrônico " & [email], [razaoSocial] & ", pessoa jurídica de direito privado, devidamente registrado sob o CNPJ nº " & [cnpj] & ", e com sede na " & [strEndereco] & ", neste ato representada por " & [strRepresentanteLegal]) & "."
                     fields {
                         +[naturezaJuridica] : List ("Pessoa Física", "Pessoa Jurídica") {
@@ -163,7 +163,7 @@ template[TEMP_Procuracao] {
                                 name = "E-mail"
                             },
                             +[strRepresentanteLegal] : Struct {
-                                name = "Dados do Representante Legal"
+                                name = "Dados do representante legal"
                                 id = [nome] & ", " & printIf([ehBrasileiro], "brasileiro", [nacionalidade]) & ", " & [estadoCivil] & ", inscrito no CPF sob nº: " & [cpf] & " e cedula de identidade RG nº: " & [rg] & ", residente e domiciliado na " & [strEndereco] & ", endereço eletrônico " & [email]
                                 fields {
                                     +[nome] : String {
@@ -200,7 +200,7 @@ template[TEMP_Procuracao] {
                     }
                 },
                 +|mtxOutorgados| : Vector[Struct] {
-                    name = "Dados do Outorgado"
+                    name = "Dados do outorgado"
                     id = printIf([temSociedade] == true, [nome] & ", " & printIf([ehBrasileiro], "brasileiro", [nacionalidade]) & ", " & [estadoCivil] & ", advogado inscrito na OAB/" & [uf] & " sob o nº: " & [oab] & ", portador do RG nº: " & [rg] & ", CPF: " & [cpf] & ", integrante da " & [sociedade] & ", pessoa jurídica de direito privado, devidamente inscrita no CNPJ: " & [cnpj] & ", registrada na OAB/" & [uf] & " sob o nº: " & [registroSociedade] & ", com sede na " & [strEnderecoSociedade] & ", endereço eletrônico " & [emailSociedade], [nome] & ", " & printIf([ehBrasileiro], "brasileiro", [nacionalidade]) & ", " & [estadoCivil] & ", advogado inscrito na OAB/" & [uf] & " sob o nº: " & [oab] & ", portador do RG nº: " & [rg] & ", CPF: " & [cpf] & ", residente e domiciliado em " & [strEndereco] & ", endereço eletrônico " & [email]) & "."
                     fields {
                         +[nome] : String {
