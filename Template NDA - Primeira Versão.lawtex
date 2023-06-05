@@ -1,0 +1,479 @@
+template[TEMP_NDA] { 
+    metainfo { 
+        language = "pt_BR"
+        name = "Acordo de Confidencialidade"
+        style = "STY_Padrão.lawsty"
+        declarations {
+            // CONSTANTES
+            -#bl# : String {value = "\b"},
+            -#dbl# : String {value = "\b\b"},
+            -#parag# : String {value = "\t"},
+            // TIPOS STRUCTS
+                struct[STR_Endereco] {
+                    name = "Endereço"
+                    id = [logradouro] & ", nº " & [numero] & printIf([complemento].isNotEmpty(), ", complemento " & [complemento], null) & ", " & [bairro] & ", CEP " & [cep] & ", " & firstUpper([cidade]) & "/" & [estado].getByKey("Sigla")
+                    fields {
+                        -[state] : String,
+                        -[proxy_cep] : String,
+                        +[cep] : String where ("CEP"){
+                            name = "CEP"
+                        },
+                        -[cidade] : String {
+                            name = "Cidade"
+                        },
+                        -[estado] : List[*Uf] {
+                            name = "Estado"
+                            atomic = true
+                        },
+                        -[logradouro] : String { 
+                            name = "Logradouro"
+                        },
+                        +[numero] : String {
+                            name = "Número"
+                            help = "Se não houver, informe \"S/N\"."
+                        },
+                        &[complemento] : String {
+                            name = "Complemento"
+                        },
+                        -[bairro] : String {
+                            name = "Bairro"
+                        }
+                    }
+                    loaders {
+                        if ([cep].isNotEmpty() AND <this>.isChecked() == false) {
+                            // LÓGICA PARA LIMPAR AS INFORMAÇÕES EM CASO DE MUDANÇA DE CEP
+                                if ([cep].hasChanged()) {
+                                    [cidade].clear(),
+                                    [estado].clear(),
+                                    [logradouro].clear(),
+                                    [numero].clear(),
+                                    [complemento].clear(),
+                                    [bairro].clear()
+                                },
+                            //CHAMADA DE API PARA PEGARMOS AS INFORMAÇÕES NO SITE DOS CORREIOS1
+                                APIGet(<this>, null, "https://brasilapi.com.br/api/cep/v1/" & [cep], "street:logradouro, neighborhood:bairro, city:cidade, cep:proxy_cep"),
+                            //MUDANÇA DE MANDATORY PARA CHECARMOS AS INFORMAÇÕES
+                                [cidade].mandatory = "+",
+                                [estado].mandatory = "+",
+                                [logradouro].mandatory = "+",
+                                [numero].mandatory = "+",
+                                [complemento].mandatory = "&",
+                                [bairro].mandatory = "&",
+                            // LÓGICA DA LISTA
+                                if ([state] == "SP") {[estado].add("São Paulo")}
+                                elseif ([state] == "AC") {[estado].add("Acre")}
+                                elseif ([state] == "AL") {[estado].add("Alagoas")}
+                                elseif ([state] == "AP") {[estado].add("Amapá")}
+                                elseif ([state] == "AM") {[estado].add("Amazonas")}
+                                elseif ([state] == "BA") {[estado].add("Bahia")}
+                                elseif ([state] == "CE") {[estado].add("Ceará")}
+                                elseif ([state] == "DF") {[estado].add("Distrito Federal")}
+                                elseif ([state] == "ES") {[estado].add("Espírito Santo")}
+                                elseif ([state] == "GO") {[estado].add("Goiás")}
+                                elseif ([state] == "MA") {[estado].add("Maranhão")}
+                                elseif ([state] == "MT") {[estado].add("Mato Grosso")}
+                                elseif ([state] == "MS") {[estado].add("Mato Grosso do Sul")}
+                                elseif ([state] == "MG") {[estado].add("Minas Gerais")}
+                                elseif ([state] == "PR") {[estado].add("Paraná")}
+                                elseif ([state] == "PB") {[estado].add("Paraíba")}
+                                elseif ([state] == "PA") {[estado].add("Pará")}
+                                elseif ([state] == "PE") {[estado].add("Pernambuco")}
+                                elseif ([state] == "PI") {[estado].add("Piauí")}
+                                elseif ([state] == "RJ") {[estado].add("Rio de Janeiro")}
+                                elseif ([state] == "RN") {[estado].add("Rio Grande do Norte")}
+                                elseif ([state] == "RS") {[estado].add("Rio Grande do Sul")}
+                                elseif ([state] == "RO") {[estado].add("Rondônia")}
+                                elseif ([state] == "RR") {[estado].add("Roraima")}
+                                elseif ([state] == "SC") {[estado].add("Santa Catarina")}
+                                elseif ([state] == "SE") {[estado].add("Sergipe")}
+                                elseif ([state] == "TO") {[estado].add("Tocantins")},
+                            //SALVAMOS AS RESPOSTAS
+                                <this>.save()
+                        }
+                    }
+                },
+                    //STRUCTS - INFORMAÇÕES DO CONTRATO
+                +<strVigencia> : Struct {
+                    name = "Vigência do contrato"
+                    id = printIf([duracao] == "Prazo determinado", "pelo prazo de " & printIf([prazo] == "Outro"/*poderia usar .isNotEmpty?*/, [prazoOutro], [prazo]) & " a partir da data de sua assinatura.", "a partir da data de sua assinatura, por prazo ilimitado, sendo vedado o descumprimento de quaisquer obrigações ora pactuadas, a qualquer tempo, sob pena da cominação da indenização prevista neste Acordo.")
+                    fields {
+                        +[duracao] : List ("Prazo determinado", "Prazo indeterminado") {
+                            name = "Prazo de vigência"
+                            request = "O acordo será por prazo..."
+                            atomic = true  
+                        },
+                        if ([duracao] == "Prazo determinado") {
+                            +[prazo] : List ("6 (seis) meses", "1 (um) ano", "2 (dois) anos", "3 (três) anos", "4 (quatro) anos", "5 (cinco) anos", "10 (dez) anos", "Outro") {
+                                name = "Qual a duração do acordo?"
+                                request = "Selecione o prazo do contrato"
+                                atomic = true
+                            },
+                            if ([prazo] == "Outro") {
+                                +[prazoOutro] : String {
+                                    name = "Indique o prazo"
+                                    request = "Especifique o prazo de duração do acordo, indicando, inclusive, se ele será em semanas, meses ou anos"
+                                    help = "Ex: 4 (quatro anos) e 6 (seis) meses ou 8 (oito) anos"
+                                }
+                            }
+                        }
+                    }
+                },
+                +<strForo> : Struct { 
+                    name = "Foro de eleição"
+                    id = [cidade] & ", " & [estado]
+                    fields {
+                        +[cidade] : String {
+                            name = "Cidade"
+                            request = "Informe a cidade"
+                        },
+                        +[estado] : List[*Uf] {
+                            name = "Estado"
+                            atomic = true
+                        }
+                    }
+                },
+                +<strLocalData> : Struct {
+                    name = "Local e data de assinatura"
+                    id = [cidadeUf] & ", " & expandedDate([data])
+                    fields {
+                        +[cidadeUf] : String {
+                            name = "Local de assinatura"
+                            request = "Informe o local de assinatura como Cidade/UF"
+                        },
+                        +[data] : String where ("\d\d/\d\d/\d\d\d\d") {
+                            name = "Data"
+                            request = "Informe a data de assinatura do contrato"
+                        }
+                    }
+                },
+                +<strTestemunhas> : Struct { 
+                    name = "Testemunhas"
+                    fields {
+                        +[testemunha] : Boolean {
+                            name = "OPCIONAL: Testemunhas"
+                            request = "Deseja incluir a assinatura de duas testemunhas?" 
+                            help = "Incluir a assinatura de duas testemunhas faz parte da formalidade para tornar o acordo um título executivo, mas não é obrigatório, você pode finalizar o documento sem incluí-las."
+                        },
+                        if ([testemunha] == true) {
+                            +[nome] : String {
+                                name = "Nome da 1ª testemunha"
+                            },
+                            +[rg] : String {
+                                name = "RG"
+                            },
+                            +[cpf] : String where ("CPF") {
+                                name = "CPF"
+                            },
+                            +[nome2] : String {
+                                name = "Nome da 2ª testemunha"
+                            },
+                            +[rg2] : String {
+                                name = "RG"
+                            },
+                            +[cpf2] : String where ("CPF") {
+                                name = "CPF"
+                            }
+                        }
+                    }
+                },
+                +<strMulta> : Struct {
+                    name = "Multa"
+                    fields {
+                        +[multa] : Boolean {
+                            name = "Multa por inadimplemento"
+                            request = "Haverá previsão de multa por descumprimento do contrato?"
+                        },
+                        if ([multa] == true) {
+                            +[valorMulta] : Currency {
+                                name = "Valor da multa"
+                                request = "Digite o valor da multa (REAL BRL)"
+                            }
+                        }
+                    }
+                },
+            // MATRIZES - VETORES DE ESTRUTURAS - VECTOR[STRUCT]
+                +|mtxPartes| : Vector[Struct] {
+                    name = "Informações das partes"
+                    id = printIf([naturezaJuridica] == "Pessoa Física", [nome] & ", " & printIf([ehBrasileiro], "brasileiro", [nacionalidade]) & ", " & [estadoCivil] & ", inscrito no CPF sob nº: " & [cpf] & " e cédula de identidade RG nº: " & [rg] & ", residente e domiciliado na " & [strEndereco] & ", endereço eletrônico " & mailto([email]), [razaoSocial] & ", pessoa jurídica de direito privado, devidamente registrado sob o CNPJ nº " & [cnpj] & ", e com sede na " & [strEndereco] & ", neste ato representada por " & [strRepresentanteLegal]) & "."
+                    fields {
+                        +[naturezaJuridica] : List ("Pessoa Física", "Pessoa Jurídica") {
+                            name = "Natureza Jurídica"
+                            request = "Selecione a natureza jurídica"
+                            atomic = true
+                        },
+                        if ([naturezaJuridica] == "Pessoa Física") {
+                            +[nome] : String {
+                                name = "Nome"
+                            },
+                            +[ehBrasileiro] : Boolean {
+                                name = "Brasileiro"
+                                request = "A parte é brasileira?"
+                                default = true
+                            },
+                            if ([ehBrasileiro] == false) {
+                                +[nacionalidade] : String {
+                                    name = "Nacionalidade"
+                                }
+                            },
+                            +[estadoCivil] : List ("solteiro", "casado", "separado", "divorciado", "viúvo") {
+                                name = "Estado Civil"
+                                atomic = true
+                            },
+                            +[cpf] : String where ("CPF"){
+                                name = "CPF"
+                            },
+                            +[rg] : String {
+                                name = "RG"
+                            },
+                            +[email] : String {
+                                name = "E-mail"
+                            }                            
+                        }
+                        else {
+                            +[razaoSocial] : String {
+                                name = "Informe a Razão Social"
+                            },
+                            +[cnpj] : String where ("CNPJ") {
+                                name = "CNPJ"
+                            },
+                            +[email] : String {
+                                name = "E-mail"
+                            },
+                            +[strRepresentanteLegal] : Struct {
+                                name = "Dados do representante legal"
+                                id =  [nome] & ", " & printIf([ehBrasileiro], "brasileiro", [nacionalidade]) & ", " & [estadoCivil] & ", inscrito no CPF sob nº: " & [cpf] & " e cédula de identidade RG nº: " & [rg] & ", residente e domiciliado na " & [strEndereco] & ", endereço eletrônico " & [email]
+                                fields {
+                                    +[nome] : String {
+                                        name = "Nome"
+                                    },
+                                    +[ehBrasileiro] : Boolean {
+                                        name = "Brasileiro"
+                                        request = "O representante é brasileiro?"
+                                        default = true
+                                    },
+                                    if ([ehBrasileiro] == false) {
+                                        +[nacionalidade] : String {
+                                            name = "Nacionalidade"
+                                        }
+                                    },
+                                    +[estadoCivil] : List ("solteiro", "casado", "separado", "divorciado", "viúvo") {
+                                        name = "Estado Civil"
+                                        atomic = true
+                                    },
+                                    +[cpf] : String where ("CPF"){
+                                        name = "CPF"
+                                    },
+                                    +[rg] : String {
+                                        name = "RG"
+                                    },
+                                    +[email] : String {
+                                        name = "E-mail"
+                                    },
+                                    +[strEndereco] : STR_Endereco
+                                }
+                            }
+                        },
+                        +[strEndereco] : STR_Endereco
+                    }
+                },
+            // INFORMAÇÕES DO CONTRATO - Declaração simples
+            +<motivoInformacao> : String {
+                name = "Motivo da troca de informações"
+                request = "As informações confidenciais serão compartilhadas porque as partes pretendem..."
+                help = "Ex: Estudo de viabilidade para parceria comercial; Analisar um potencial investimento"
+            },
+            +<tiposInformacao> : String {
+                name = "Tipos de informações"
+                request = "Liste os tipos de informações que serão compartilhadas"
+                help = "Ex: bancos de dados, negócios, estratégias, projetos em desenvolvimento e balanços"
+            },
+            +<aliciamento> : Boolean { 
+                name = "Cláusula de não-aliciamento"
+                request = "Haverá restrição ao aliciamento de clientes, fornecedores e empregados pelas partes?"
+            },
+            +<assinaturaDigital> : Boolean { 
+                name = "Assinatura digital"
+                request = "A assinatura será feita digitalmente?"
+            },
+            // ENCERRAMENTO
+            +<desejaEmail> : Boolean {
+                name = "Deseja e-mail"
+                help = "Ao clicar em \"SIM\", encaminharemos o acordo de confidencialidade por e-mail para as partes"
+            }
+
+        } 
+    } 
+    head { 
+        title = "Acordo de Confidencialidade" 
+    } 
+    body {
+        declarations {
+            branch[BRC_Qualificacao] {
+                operations {
+                print "O presente Acordo de Confidencialidade (\"Acordo\") é celebrado entre:" & #dbl#,
+                print uppercase(bold(|mtxPartes|.grammar("parte"))) & ": ",
+                foreach(<partes> IN |mtxPartes|) where (separator = "%f;\b\b%s;\b\b%p; e\b\b%l\b\b") {
+                    print <partes>
+                },
+                print "Sendo denominados em conjunto (\"Partes\"), e cada um deles, individualmente e indistintamente, denominado (\"Parte\");" & #dbl#
+                }
+            },
+            branch[BRC_Informacoes] { 
+                operations {
+                    // CONSIDERANDOS
+                print bold("CONSIDERANDO QUE:") & #dbl#,
+                print "(I) as Partes pretendem trocar informações para " & <motivoInformacao> & " (\"Projeto\");" & #dbl#,
+                print "(II) nesse contexto, as Partes revelarão, entre si, determinadas informações sobre o Projeto e a respeito de " & <tiposInformacao> & ", sendo de caráter estritamente sigiloso e confidencial, limitando seu uso e acesso por terceiros;" & #dbl#,
+                print "(III) as Partes, como condição essencial ao fornecimento das informações, desejam estabelecer as obrigações de sigilo e confidencialidade a serem observadas pelas Partes, bem como o tratamento a ser atribuído por estas às Informações Confidenciais (conforme definição abaixo) sob os termos deste Acordo;" & #dbl#,
+                print "RESOLVEM as Partes celebrar este Acordo, que se regerá pelos seguintes termos e condições:" & #dbl#,
+                    // CLÁUSULAS
+                    // 1. DEFINIÇÕES E INFORMAÇÕES CONFIDENCIAIS 
+                print uppercase(bold("cláusula 1. definições e informações confidenciais")) & #dbl#,
+                print bold("1.1. ") & "Para fins deste Acordo, a Parte reveladora significa a Parte que fornecer as Informações Confidenciais (isoladamente \"Parte Reveladora\" e, em conjunto, \"Partes Reveladoras\") e a Parte receptora significa a Parte que receber as Informações Confidenciais (isoladamente \"Parte Receptora\" e, em conjunto, \"Partes Receptoras\")." & #dbl#,
+                print bold("1.2. ") & underline("Representantes.") & " Para todos os fins e efeitos deste Acordo, o termo \"Representantes\" significará os administradores, prepostos, diretores, procuradores, empregados, consultores, incluindo, sem limitação, os advogados, contadores e assessores financeiros das Partes Receptoras que devam, necessariamente, tomar conhecimento das Informações Confidenciais para fins de análise e consumação do Projeto." & #dbl#,
+                print bold("1.3. ") & underline("Informações Confidenciais.") & " Para os fins deste Acordo, o termo \"Informações Confidenciais\" compreende:" & #dbl#,
+                print "(i) todas e quaisquer informações técnicas, financeiras, legais e/ou analíticas das Partes Reveladoras, fornecidas oralmente ou por qualquer forma escrita, inclusive eletrônica, às Partes Receptoras e/ou seus Representantes durante o prazo de vigência deste Acordo, incluindo, mas não se limitando a informaçõs relativas a seus ativos, operações, serviços, tecnologias, atividades, demonstrações financeiras, estrutura societária, estratégias, negócios, relacionamentos com clientes e fornecedores, direitos de propriedade intelectual e demais informações inerentes ao setor em que as Partes Reveladoras atuam;" & #dbl#,
+                print "(ii) todas as comunicações, correspondências, mensagens eletrônicas ou similares, anotações, análises, compilações, estudos, relatórios, propostas ou outros documentos preparados pelas Partes Receptoras ou seus Representantes, os quais contenham ou sejam baseados sobre, no todo ou em parte, informações fornecidas às Partes Receptoras nos termos do presente Acordo;" & #dbl#,
+                print "(iii) discussões e negociações e quaisquer documentos decorrentes de tais discussões e negociações entre as Partes relativas ao Projeto; e" & #dbl#,
+                print "(iv) o presente Acordo." & #dbl#,
+                print bold("1.4. ") & underline("Exceções.") & " Não serão consideradas Informações Confidenciais para os fins deste Acordo as informações que:" & #dbl#,
+                print "(i) no momento da divulgação às Partes Receptoras ou seus Representantes, já forem de domínio público ou do conhecimento das Partes, por fontes legítimas diversas das Partes Reveladoras;" & #dbl#,
+                print "(ii) que, após a divulgação para as Partes Receptoras, tornarem-se disponíveis de forma generalizada para terceiros, sem que tal fato tenha ocorrido por culpa ou dolo das Partes Receptoras;" &#dbl#,
+                print "(iii) tenham sido desenvolvidas de forma independente pelas Partes Receptoras, sem que para tanto tenha sido feito uso de Informações Confidenciais; e" & #dbl#,
+                print "(iv) cuja revelação para terceiros (que não os Representantes das Partes Receptoras) seja prévia e expressamente autorizada por escrito pelas Partes Reveladoras." & #dbl#, 
+                    // 2. USO DAS INFORMAÇÕES CONFIDENCIAIS
+                print uppercase(bold("cláusula 2. uso das informações confidenciais")) & #dbl#,
+                print bold("2.1. ") & underline("Compromisso de Confidencialidade.") & " As Partes Receptoras concordam expressamente em manter em estrita confidencialidade e em guardar sigilo absoluto sobre todas as Informações Confidenciais, não as revelando para quaisquer terceiros, com exceção de seus Representantes." & #dbl#,
+                print bold("2.2. ") & underline("Vedação do Uso.") & " É vedado às Partes Receptoras o uso de qualquer Informação Confidencial para outros fins que não exclusivamente a análise do Projeto, inclusive e principalmente a utilização de tais Informações Confidenciais para quaisquer fins que possam de qualquer forma prejudicar os negócios das Partes Reveladoras." & #dbl#,
+                print bold("2.3. ") & underline("Extensão aos Representantes.") & " As Partes Receptoras se comprometem a informar aos Representantes a natureza estritamente sigilosa das Informações Confidenciais, bem como os termos e as condições deste Acordo, responsabilizando-se por qualquer violação por parte de seus Representantes de qualquer das disposições estabelecidas neste Acordo. Ainda, as Partes Receptoras deverão assegurar que todos os Representantes que tenham acesso a quaisquer Informações Confidenciais firmem compromisso de confidencialidade compatível com as obrigações de confidencialidade aqui contidas." & #dbl#,
+                print bold("2.4. ") & underline("Manutenção da Segurança e Controle de Acesso.") & " As Partes Receptoras se responsabilizam pela segurança e o controle das Informações Confidenciais, devendo atribuir a estas o mesmo nível de cuidado, diligência e discrição dispensado às suas próprias informações similares que não desejam que sejam divulgadas, publicadas ou disseminadas, as mantendo em lugares seguros." & #dbl#,
+                print bold("2.5. ") & underline("Notificação de Uso Não-Autorizado ou Vazamento.") & " Caso ocorra o uso não-autorizado ou vazamento das Informações Confidenciais, As Partes Receptoras se comprometem a informar imediatamente a contraparte, para que as medidas necessárias para evitar a circulação das Informações Confidenciais possam ser tomadas. Eventuais custos advindos da tentativa de mitigação do uso não-autorizado ou do vazamento serão incorridos pela parte que lhes deu causa, tanto por culpa quanto dolo; sem prejuízo da incidência das multas previstas nesse Acordo e de eventuais indenizações por pelas perdas e danos experimentados pela Parte inocente." & #dbl#,
+                print bold("2.6. ") & underline("Não Vinculação Quanto à Realização do Projeto.") & " As Partes expressamente concordam que este Acordo não gera e não deverá ser interpretado como gerador de qualquer obrigação de uma Parte para com a outra com relação à realização do Projeto, inclusive não vincula as Partes Reveladoras à aceitação de qualquer proposta que venha a ser feita pelas Partes Receptoras para tal Projeto." & #dbl#,
+                    // 3. PROPRIEDADE DAS INFORMAÇÕES CONFIDENCIAIS
+                print uppercase(bold("cláusula 3. propriedade das informações confidenciais")) & #dbl#,
+                print bold("3.1. ") & underline("Propriedade das Informações.") & " Todas e quaisquer Informações Confidenciais divulgadas pelas Partes Reveladoras permanecerão como propriedade exclusiva destas, ou de suas sociedades controladoras, controladas ou coligadas, conforme aplicável, sendo certo que as Partes Receptoras não possuem nem possuirão quaisquer direitos sobre as Informações Confidenciais, tampouco sobre suas eventuais cópias e relatórios ou quaisquer outros documentos preparados a partir das Informações Confidenciais, incluindo eventuais produtos ou ideias que utilizem as Informações Confidenciais como base." & #dbl#,
+                print bold("3.2. ") & underline("Destruição das Informações.") & " As Partes Receptoras se obrigam a destruir ou devolver às Partes Reveladoras todo o material recebido com relação às Informações Confidenciais, inclusive suas eventuais cópias e relatórios ou quaisquer outros documentos preparados com base nas Informações Confidenciais, imediatamente após requerimento por escrito das Partes Reveladoras ou tão logo as Partes Receptoras decidam por não dar continuidade à avaliação do Projeto com as Partes Reveladoras." & #dbl#,
+                    // 4. REVELAÇÃO EM VIRTUDE DE ORDEM JUDICIAL/ADMINISTRATIVA
+                print bold("4.1. ") & underline("Medidas em Caso de Recebimento de Ordem Judicial ou Administrativa.") & " As Partes Receptoras informarão imediatamente as Partes Reveladoras acerca de qualquer ordem judicial ou requisição de autoridade competente exigindo a revelação de Informações Confidenciais, previamente à divulgação decorrente da ordem correspondente. As Partes Reveladoras tomarão as medidas pertinentes para evitar tal revelação, devendo as Partes Receptoras sempre prestar o auxílio necessário e imediato, observadas eventuais proibições expressas presentes em tal ordem judicial ou requisição de autoridade competente. Caso as Partes Reveladoras não consigam ou não pretendam evitar tal revelação, as Partes Receptoras deverão:" & #dbl#,
+                print "(i) revelar à autoridade competente somente as informações que sejam estritamente necessárias para cumprir com a ordem ou requisição;" & #dbl#,
+                print "(ii) informar tal autoridade acerca do caráter estritamente confidencial e sigiloso das Informações Confidenciais; e" & #dbl#,
+                print "(iii) requerer que o procedimento ou processo prossiga em caráter sigiloso, e que sejam tomadas medidas suficientes para preservar o sigilo das Informações Confidenciais." & #dbl#,
+                print bold("4.2. ") & underline("Manutenção da Confidencialidade.") & " Qualquer Informação Confidencial divulgada nos termos desta Cláusula 4 será mantida como confidencial nos termos deste Acordo para todos os outros efeitos." & #dbl#,
+                    // 5. DESCUMPRIMENTO CONTRATUAL
+                print uppercase(bold("cláusula 5. descumprimento contratual")) & #dbl#,
+                print bold("5.1. ") & underline("Penalidades por Inadimplemento.") & " O inadimplemento, pelas Partes Receptoras ou por seus Representantes, de quaisquer dos termos e condições do presente Acordo sujeitará as Partes Receptoras inadimplentes ao pagamento do valor correspondente às perdas e danos causados às Partes Reveladoras (inclusive lucros cessantes e eventuais danos morais), e dos honorários advocatícios relacionados, sem prejuízo da execução específica das obrigações previstas no presente Acordo, bem como da aplicação de toda e qualquer sanção cível e/ou penal prevista na legislação brasileira." & #dbl#,
+                print bold("5.2. ") & underline("Manutenção da Obrigação de Confidencialidade.") & " O pagamento das perdas e danos (inclusive lucros cessantes e honorários advocatícios relacionados), bem como o cumprimento das sanções cíveis e/ou penais cabíveis não isentará as Partes Receptoras do cumprimento das obrigações previstas neste Acordo. Sem prejuízo dos direitos ou outros remédios legais disponíveis, as Partes Reveladoras poderão requerer a execução específica deste Acordo, ou qualquer medida judicial cabível, em caso de violação ou ameaça de violação deste Acordo pelas Partes Receptoras ou seus Representantes." & #dbl#,
+                if (<strMulta.multa> == true) {
+                   print bold("5.3. ") & underline("Multa por Inadimplemento.") & " Qualquer infração ao disposto neste Acordo por qualquer uma das Partes sujeitará cada Parte infratora ao pagamento de multa não compensatória no valor de R$" & <strMulta.valorMulta> & " (" & expandedCurrency(<strMulta.valorMulta>, "BRL") & ") sem prejuízo do pagamento de indenização nos termos do Código Civil Brasileiro" & #dbl# 
+                },
+                    // 6. NÃO-ALICIAMENTO (varíavel)
+                if (<aliciamento> == true) {
+                    print uppercase(bold("cláusula 6. não-aliciamento")) & #dbl#,
+                    print bold("6.1 ") & underline("Não-Aliciamento.") & " As Partes receptoras se comprometem, seja direta ou indiretamente, em benefício próprio ou de terceiros, a abster-se de aceitar o desempenho de serviços, solicitar a contratação, persuadir, aliciar ou tentar atrair: (a) qualquer pessoa física ou jurídica empregada e/ou contratada pelas Partes Reveladoras, bem como qualquer diretor ou administrador das Partes Reveladoras, a deixar seu emprego ou terminar seu vínculo contratual com as Partes Reveladoras; e (b) qualquer cliente ou fornecedor das Partes Reveladoras a deixar de realizar negócios com as Partes Reveladoras." & #dbl#
+                },
+                    // 7/6. DISPOSIÇÕES GERAIS
+                if (<aliciamento> == true) {
+                    print uppercase(bold("cláusula 7. disposições gerais")) & #dbl#,
+                    print bold("7.1. ") & underline("Vigência.") & " Este acordo é firmado e será considerado válido, obrigando as Partes e seus sucessores a qualquer título " & <strVigencia> & #dbl#,
+                    print bold("7.2. ") & underline("Direitos Sobre as Informações Confidenciais.") & " Nada neste Acordo deve ser lido de forma a assegurar às Partes Receptoras qualquer direito de exclusividade com relação às informações utilizadas para a avaliação do Projeto. Qualquer informação, documento, imagem, produto e afins, que, diretamente ou indiretamente, seja referente ao Projeto, ainda que produzida integralmente pelas Partes Receptoras, só poderá ser divulgada mediante autorização por escrito das Partes Reveladoras, sob pena de quebra do presente Acordo." & #dbl#,
+                    print bold("7.3. ") & underline("Responsabilidade por Despesas.") & " Salvo se de outra forma previsto neste Acordo, cada Parte arcará com seus próprios custos e despesas (incluindo custos e despesas com advogados, consultores, auditores e outros assessores) incorridos para a celebração deste Acordo ou em decorrência do pactuado neste Acordo e das obrigações nele previstas." & #dbl#,
+                    print bold("7.4. ") & underline("Acordo Integral.") & " O presente Acordo reflete a íntegra dos entendimentos e acordos assumidos entre as Partes em relação ao objeto deste Acordo, envolvendo conversas prévias e trocas de e-mail, por exemplo. Sendo assim, revoga e substitui qualquer entendimento, acordo ou contrato, verbal ou escrito, celebrado entre as Partes anteriormente à assinatura deste Acordo no que diz respeito às Informações Confidenciais." & #dbl#,
+                    print bold("7.5. ") & underline("Alteração.") & " O presente Acordo somente poderá ser validamente alterado, modificado ou aditado por manifestação expressa, mediante instrumento escrito devidamente assinado por todas as Partes." & #dbl#,
+                    print bold("7.6. ") & underline("Autonomia das Disposições.") & " A invalidade parcial deste Acordo não o afetará na parte considerada válida, desde que as obrigações sejam desmembráveis entre si. Ocorrendo o disposto nesta Cláusula, as Partes desde já se comprometem a negociar, no menor prazo possível, em substituição à cláusula invalidada, a inclusão de termos e condições válidos, observados a intenção e o objetivo das Partes quando da negociação da cláusula invalidada e o contexto em que se insere." & #dbl#,
+                    print bold("7.7. ") & underline("Cessão de Direitos.") & " Nenhuma das Partes poderá ceder este Acordo, ou os direitos e obrigações nele estabelecidos, sem o prévio e expresso consentimento por escrito das outras Partes." & #dbl#,
+                    print bold("7.8. ") & underline("Tolerância.") & " A tolerância de qualquer das Partes com relação à exigência do regular e tempestivo cumprimento das obrigações de outras Partes não constituirá desistência, alteração, modificação, ou novação de quaisquer dos direitos ou obrigações estabelecidos por meio deste Acordo, constituindo mera liberdade, que não impedirá a Parte tolerante de exigir das outras o fiel e cabal cumprimento deste Acordo, a qualquer tempo." & #dbl#,
+                    print bold("7.9. ") & underline("Renúncia.") & " Nenhuma renúncia a exercício de direito assegurado neste Acordo será válida, exceto se formalizada por escrito pela Parte renunciante." & #dbl#,
+                    print bold("7.10. ") & underline("Lei Aplicável e Foro.") & " Este acordo será regido e interpretado de acordo com as leis da República Federativa do Brasil. As Partes desde já elegem o Foro da Comarca de " & <strForo> & ", como o competente para dirimir quaisquer questões porventura oriundas do presente Acordo, com expressa renúncia a qualquer outro, por mais privilegiado que seja." & #dbl#,
+                    printIf(<assinaturaDigital> == true, bold("7.11. ") & underline("Certificação Digital de Assinaturas e de Vias deste Acordo.") & " As Partes neste ato declaram que (i) é admitida como válida e verdadeira a assinatura deste Acordo por meio de certificado digital emitido por entidades credenciadas para tanto pela Infraestrutura de Chaves Públicas Brasileira - ICP-Brasil; e (ii) são admitidas como válidas e originais as vias deste Acordo emitidas por meios de comprovação da autoria e integridade de documentos em forma eletrônica, inclusive os que utilizem certificados não emitidos pela ICP-Brasil." & #dbl#, null)   
+                }
+                else {
+                    print uppercase(bold("cláusula 6. disposições gerais")) & #dbl#,
+                    print bold("6.1. ") & underline("Vigência.") & " Este acordo é firmado e será considerado válido, obrigando as Partes e seus sucessores a qualquer título " & <strVigencia> & #dbl#,
+                    print bold("6.2. ") & underline("Direitos Sobre as Informações Confidenciais.") & " Nada neste Acordo deve ser lido de forma a assegurar às Partes Receptoras qualquer direito de exclusividade com relação às informações utilizadas para a avaliação do Projeto. Qualquer informação, documento, imagem, produto e afins, que, diretamente ou indiretamente, seja referente ao Projeto, ainda que produzida integralmente pelas Partes Receptoras, só poderá ser divulgada mediante autorização por escrito das Partes Reveladoras, sob pena de quebra do presente Acordo." & #dbl#,
+                    print bold("6.3. ") & underline("Responsabilidade por Despesas.") & " Salvo se de outra forma previsto neste Acordo, cada Parte arcará com seus próprios custos e despesas (incluindo custos e despesas com advogados, consultores, auditores e outros assessores) incorridos para a celebração deste Acordo ou em decorrência do pactuado neste Acordo e das obrigações nele previstas." & #dbl#,
+                    print bold("6.4. ") & underline("Acordo Integral.") & " O presente Acordo reflete a íntegra dos entendimentos e acordos assumidos entre as Partes em relação ao objeto deste Acordo, envolvendo conversas prévias e trocas de e-mail, por exemplo. Sendo assim, revoga e substitui qualquer entendimento, acordo ou contrato, verbal ou escrito, celebrado entre as Partes anteriormente à assinatura deste Acordo no que diz respeito às Informações Confidenciais." & #dbl#,
+                    print bold("6.5. ") & underline("Alteração.") & " O presente Acordo somente poderá ser validamente alterado, modificado ou aditado por manifestação expressa, mediante instrumento escrito devidamente assinado por todas as Partes." & #dbl#,
+                    print bold("6.6. ") & underline("Autonomia das Disposições.") & " A invalidade parcial deste Acordo não o afetará na parte considerada válida, desde que as obrigações sejam desmembráveis entre si. Ocorrendo o disposto nesta Cláusula, as Partes desde já se comprometem a negociar, no menor prazo possível, em substituição à cláusula invalidada, a inclusão de termos e condições válidos, observados a intenção e o objetivo das Partes quando da negociação da cláusula invalidada e o contexto em que se insere." & #dbl#,
+                    print bold("6.7. ") & underline("Cessão de Direitos.") & " Nenhuma das Partes poderá ceder este Acordo, ou os direitos e obrigações nele estabelecidos, sem o prévio e expresso consentimento por escrito das outras Partes." & #dbl#,
+                    print bold("6.8. ") & underline("Tolerância.") & " A tolerância de qualquer das Partes com relação à exigência do regular e tempestivo cumprimento das obrigações de outras Partes não constituirá desistência, alteração, modificação, ou novação de quaisquer dos direitos ou obrigações estabelecidos por meio deste Acordo, constituindo mera liberdade, que não impedirá a Parte tolerante de exigir das outras o fiel e cabal cumprimento deste Acordo, a qualquer tempo." & #dbl#,
+                    print bold("6.9. ") & underline("Renúncia.") & " Nenhuma renúncia a exercício de direito assegurado neste Acordo será válida, exceto se formalizada por escrito pela Parte renunciante." & #dbl#,
+                    print bold("6.10. ") & underline("Lei Aplicável e Foro.") & " Este acordo será regido e interpretado de acordo com as leis da República Federativa do Brasil. As Partes desde já elegem o Foro da Comarca de " & <strForo> & ", como o competente para dirimir quaisquer questões porventura oriundas do presente Acordo, com expressa renúncia a qualquer outro, por mais privilegiado que seja." & #dbl#,
+                    printIf(<assinaturaDigital> == true, bold("6.11. ") & underline("Certificação Digital de Assinaturas e de Vias deste Acordo.") & " As Partes neste ato declaram que (i) é admitida como válida e verdadeira a assinatura deste Acordo por meio de certificado digital emitido por entidades credenciadas para tanto pela Infraestrutura de Chaves Públicas Brasileira - ICP-Brasil; e (ii) são admitidas como válidas e originais as vias deste Acordo emitidas por meios de comprovação da autoria e integridade de documentos em forma eletrônica, inclusive os que utilizem certificados não emitidos pela ICP-Brasil." & #dbl#, null)
+                },
+                    // DATA
+                print  align(<strLocalData>, "right")         
+                
+                }
+            },
+            branch[BRC_Assinaturas] {
+                operations {
+                    foreach(<partes> IN |mtxPartes|) where (separator = "%f\b\b%s\b\b%p\b\b%l\b\b") {
+                        print #dbl# & align("____________________________________________", "center") & align(printIf(<partes.naturezaJuridica> == "Pessoa Física", <partes.nome>, <partes.strRepresentanteLegal.nome>), "center")
+                    },
+                    if ([strTestemunhas.testemunha] == true) {
+                        print #dbl# & align(uppercase("testemunhas") & #dbl# & "____________________________________", "left") & #bl# & align([strTestemunhas.nome] & #bl# & [strTestemunhas.rg] & #bl# & [strTestemunhas.cpf], "left") & #dbl# & align("____________________________________", "left") & #bl# & align([strTestemunhas.nome2] & #bl# & [strTestemunhas.rg2] & #bl# & [strTestemunhas.cpf2], "left")    
+                    }
+                }
+            }
+        }
+        operations {
+            use BRC_Qualificacao,
+            use BRC_Informacoes,
+            use BRC_Assinaturas
+        }
+    }
+    foot {
+        declarations {
+            branch[TOC_Partes] {
+                name = "Dados das Partes"
+                index = true
+                operations {
+                    |mtxPartes|.ask()
+                }
+            },
+            branch[TOC_Informacoes] {
+                name = "Informações do Contrato"
+                index = true
+                operations {
+                    <motivoInformacao>.ask(),
+                    <tiposInformacao>.ask(),
+                    <strMulta>.ask(),
+                    <aliciamento>.ask(),
+                    <strVigencia>.ask()
+                }
+            },
+            branch[TOC_ForoAssinatura] {
+                name = "Foro e Assinatura"
+                index = true
+                operations {
+                    <strForo>.ask(),
+                    <assinaturaDigital>.ask(),
+                    <strLocalData>.ask(),
+                    <strTestemunhas>.ask()
+                }
+            },
+            branch[TOC_Encerramento] {
+                name = "Encerramento"
+                index = true
+                operations {
+                    <desejaEmail>.ask()
+                }
+            }
+        }
+        operations {
+            use TOC_Partes,
+            use TOC_Informacoes,
+            use TOC_ForoAssinatura,
+            use TOC_Encerramento
+        }
+    }
+    extra {
+        operations {
+            if (<desejaEmail>) {
+                foreach (<partes> IN |mtxPartes|) {
+                    sendMail(<partes.email>,"Acordo de Confidencialidade","Olá! Este é um e-mail automático para envio do documento finalizado","pdf")
+                }  
+            }  
+        }
+    }
+}
